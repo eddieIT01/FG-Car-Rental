@@ -1,0 +1,7 @@
+SELECT TOP (1000) [RentalID]
+      ,[Customer Name]
+      ,[Car Number]
+      ,[Start Date]
+      ,[End Date]
+      ,[Total]
+  FROM [RentalDB].[dbo].[rentals]
