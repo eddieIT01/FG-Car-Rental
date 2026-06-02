@@ -1,6 +1,0 @@
-SELECT TOP (1000) [CustomerID]
-      ,[ CustomerName]
-      ,[Gender]
-      ,[Email]
-      ,[Phone]
-  FROM [RentalDB].[dbo].[customers]

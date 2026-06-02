@@ -20,6 +20,11 @@ namespace CarRental
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            if (string.IsNullOrWhiteSpace(txtRentalID.Text) || string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(txtCarNumber.Text) || string.IsNullOrWhiteSpace(txtTotal.Text))
+            {
+                MessageBox.Show("Please fill in all fields before saving.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
 
             con.Open();
@@ -47,6 +52,11 @@ namespace CarRental
 
         private void btnUpdate_Click(object sender, EventArgs e)
         {
+            if (string.IsNullOrWhiteSpace(txtRentalID.Text) || string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(txtCarNumber.Text) || string.IsNullOrWhiteSpace(txtTotal.Text))
+            {
+                MessageBox.Show("Please fill in all fields before updating.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
 
             con.Open();
@@ -64,6 +74,11 @@ namespace CarRental
 
         private void btnDelete_Click(object sender, EventArgs e)
         {
+            if (string.IsNullOrWhiteSpace(txtRentalID.Text))
+            {
+                MessageBox.Show("Please enter a Rental ID to delete.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
 
             con.Open();
