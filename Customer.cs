@@ -1,134 +1,102 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
+using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using Newtonsoft.Json;
 
 namespace CarRental
 {
     public partial class Customer : Form
     {
-        public Customer()
+        private static readonly HttpClient client = CreateClient();
+        private static HttpClient CreateClient()
         {
-            InitializeComponent();
+            var handler = new HttpClientHandler();
+            handler.ServerCertificateCustomValidationCallback = (m, c, ch, e) => true;
+            return new HttpClient(handler);
         }
 
-        private void label5_Click(object sender, EventArgs e)
+        public Customer() { InitializeComponent(); }
+
+        private async void Customer_Load(object sender, EventArgs e) { await LoadCustomers(); }
+
+        private async System.Threading.Tasks.Task LoadCustomers()
         {
-
-        }
-
-        private void label3_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void panel2_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void btnSave_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtCustomerID.Text) || string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(cmbGender.Text) || string.IsNullOrWhiteSpace(txtEmail.Text) || string.IsNullOrWhiteSpace(txtPhone.Text))
+            try
             {
-                MessageBox.Show("Please fill in all fields before saving.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var res = await client.GetStringAsync("https://localhost:7215/api/customers");
+                dataGridView1.DataSource = JsonConvert.DeserializeObject<System.Data.DataTable>(res);
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("insert into customers Values(@customerid,@customername, @gender, @email, @phone)", con);
-            cnn.Parameters.AddWithValue("@CustomerID", int.Parse(txtCustomerID.Text));
-            cnn.Parameters.AddWithValue("@CustomerName", txtCustomerName.Text);
-            cnn.Parameters.AddWithValue("@Gender", cmbGender.GetItemText(cmbGender.SelectedItem));
-            cnn.Parameters.AddWithValue("@Email", txtEmail.Text);
-            cnn.Parameters.AddWithValue("@Phone", txtPhone.Text);
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Saved");
+            catch { MessageBox.Show("Could not load customers. Is the API running?"); }
         }
 
-        private void btnAdd_Click(object sender, EventArgs e)
+        private async void btnSave_Click(object sender, EventArgs e)
         {
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            SqlCommand cnn = new SqlCommand("Select * from customers", con);
-            SqlDataAdapter da = new SqlDataAdapter(cnn);
-            DataTable table = new DataTable();
-            da.Fill(table);
-            dataGridView1.DataSource = table;
-        }
-
-        private void btnUpdate_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtCustomerID.Text) || string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(cmbGender.Text) || string.IsNullOrWhiteSpace(txtEmail.Text) || string.IsNullOrWhiteSpace(txtPhone.Text))
+            if (string.IsNullOrWhiteSpace(txtCustomerName.Text))
+            { MessageBox.Show("Fill all fields.", "Missing Info", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            try
             {
-                MessageBox.Show("Please fill in all fields before updating.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var c = new
+                {
+                    customerName = txtCustomerName.Text,
+                    gender = cmbGender.GetItemText(cmbGender.SelectedItem),
+                    email = txtEmail.Text,
+                    phone = txtPhone.Text,
+                    username = txtCustomerName.Text.ToLower().Replace(" ", ""),
+                    password = "pass123"
+                };
+                var body = new StringContent(JsonConvert.SerializeObject(c), Encoding.UTF8, "application/json");
+                var res = await client.PostAsync("https://localhost:7215/api/customers/register", body);
+                MessageBox.Show(res.IsSuccessStatusCode ? "Customer saved!" : "Error saving.");
+                await LoadCustomers();
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("update customers set [ customername]=@customername, gender=@gender, email=@email, phone=@phone where customerid=@customerid", con);
-            cnn.Parameters.AddWithValue("@CustomerID", int.Parse(txtCustomerID.Text));
-            cnn.Parameters.AddWithValue("@CustomerName", txtCustomerName.Text);
-            cnn.Parameters.AddWithValue("@Gender", cmbGender.GetItemText(cmbGender.SelectedItem));
-            cnn.Parameters.AddWithValue("@Email", txtEmail.Text);
-            cnn.Parameters.AddWithValue("@Phone", txtPhone.Text);
-            cnn.ExecuteNonQuery(); 
-            con.Close();
-            MessageBox.Show("Record Updated");
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
-        private void btnDelete_Click(object sender, EventArgs e)
+        private async void btnUpdate_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtCustomerID.Text))
+            if (string.IsNullOrWhiteSpace(txtCustomerID.Text)) { MessageBox.Show("Enter Customer ID."); return; }
+            try
             {
-                MessageBox.Show("Please enter a Customer ID to delete.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var c = new
+                {
+                    customerID = int.Parse(txtCustomerID.Text),
+                    customerName = txtCustomerName.Text,
+                    gender = cmbGender.GetItemText(cmbGender.SelectedItem),
+                    email = txtEmail.Text,
+                    phone = txtPhone.Text,
+                    username = txtCustomerName.Text.ToLower().Replace(" ", ""),
+                    password = "pass123"
+                };
+                var body = new StringContent(JsonConvert.SerializeObject(c), Encoding.UTF8, "application/json");
+                var res = await client.PutAsync($"https://localhost:7215/api/customers/{txtCustomerID.Text}", body);
+                MessageBox.Show(res.IsSuccessStatusCode ? "Updated!" : "Error updating.");
+                await LoadCustomers();
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("delete from customers where customerid=@customerid", con);
-            cnn.Parameters.AddWithValue("@CustomerID", int.Parse(txtCustomerID.Text));
-           
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Deleted");
-        
-            }
-
-        private void cmbGender_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
-        private void Customer_Load(object sender, EventArgs e)
+        private async void btnDelete_Click(object sender, EventArgs e)
         {
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            SqlCommand cnn = new SqlCommand("Select * from customers", con);
-            SqlDataAdapter da = new SqlDataAdapter(cnn);
-            DataTable table = new DataTable();
-            da.Fill(table);
-            dataGridView1.DataSource = table;
+            if (string.IsNullOrWhiteSpace(txtCustomerID.Text)) { MessageBox.Show("Enter Customer ID."); return; }
+            try
+            {
+                var res = await client.DeleteAsync($"https://localhost:7215/api/customers/{txtCustomerID.Text}");
+                MessageBox.Show(res.IsSuccessStatusCode ? "Deleted!" : "Error deleting.");
+                await LoadCustomers();
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
+        private async void btnAdd_Click(object sender, EventArgs e) { await LoadCustomers(); }
+
+        private void label5_Click(object sender, EventArgs e) { }
+        private void label3_Click(object sender, EventArgs e) { }
+        private void panel2_Paint(object sender, PaintEventArgs e) { }
+        private void cmbGender_SelectedIndexChanged(object sender, EventArgs e) { }
         private void txtCustomerID_KeyDown(object sender, KeyEventArgs e)
         {
-            // also checks if enter was pressed
-            if (e.KeyCode == Keys.Enter)
-            {
-                e.SuppressKeyPress = true;
-                txtCustomerName.Focus();
-            }
+            if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtCustomerName.Focus(); }
         }
     }
-    }
- 
+}

@@ -1,112 +1,113 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
+using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace CarRental
 {
     public partial class Car : Form
     {
-        public Car()
+        private static readonly HttpClient client = CreateClient();
+
+        private static HttpClient CreateClient()
         {
-            InitializeComponent();
+            var handler = new HttpClientHandler();
+            handler.ServerCertificateCustomValidationCallback = (m, c, ch, e) => true;
+            return new HttpClient(handler);
         }
 
-        private void btnUpdate_Click(object sender, EventArgs e)
+        public Car() { InitializeComponent(); }
+
+        private async void Car_Load(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtCarID.Text) || string.IsNullOrWhiteSpace(txtCarName.Text) || string.IsNullOrWhiteSpace(txtCarNb.Text) || string.IsNullOrWhiteSpace(txtCarModel.Text) || string.IsNullOrWhiteSpace(txtRentPrice.Text) || string.IsNullOrWhiteSpace(txtCarStatus.Text))
+            await LoadCars();
+        }
+
+        private async System.Threading.Tasks.Task LoadCars()
+        {
+            try
             {
-                MessageBox.Show("Please fill in all fields before updating.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                var res = await client.GetStringAsync("https://localhost:7215/api/cars");
+                var cars = JsonConvert.DeserializeObject<List<dynamic>>(res);
+                dataGridView1.DataSource = JsonConvert.DeserializeObject<System.Data.DataTable>(res);
+            }
+            catch { MessageBox.Show("Could not load cars. Is the API running?"); }
+        }
+
+        private async void btnSave_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtCarName.Text) || string.IsNullOrWhiteSpace(txtCarNb.Text))
+            {
+                MessageBox.Show("Please fill all fields.", "Missing Info", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("update cars set [CarName]=@carname, [CarNumber]=@carnumber, [CarModel]=@carmodel, [RentPrice]=@rentprice, [CarStatus]=@carstatus where [CarID]=@carid", con);
-            cnn.Parameters.AddWithValue("@CarID", int.Parse(txtCarID.Text));
-            cnn.Parameters.AddWithValue("@CarName", txtCarName.Text);
-            cnn.Parameters.AddWithValue("@CarNumber", txtCarNb.Text);
-            cnn.Parameters.AddWithValue("@CarModel", txtCarModel.Text);
-            cnn.Parameters.AddWithValue("@RentPrice", int.Parse(txtRentPrice.Text));
-            cnn.Parameters.AddWithValue("@CarStatus", txtCarStatus.Text);
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Updated");
-        }
-
-        private void btnDelete_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtCarID.Text))
+            try
             {
-                MessageBox.Show("Please enter a Car ID to delete.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var car = new
+                {
+                    carName = txtCarName.Text,
+                    carNumber = txtCarNb.Text,
+                    carModel = txtCarModel.Text,
+                    rentPrice = int.Parse(txtRentPrice.Text),
+                    carStatus = txtCarStatus.Text,
+                    carClass = (string)null,
+                    color = (string)null
+                };
+                var body = new StringContent(JsonConvert.SerializeObject(car), Encoding.UTF8, "application/json");
+                var res = await client.PostAsync("https://localhost:7215/api/cars", body);
+                MessageBox.Show(res.IsSuccessStatusCode ? "Car saved!" : "Error saving car.");
+                await LoadCars();
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("delete from cars where carid=@carid", con);
-            cnn.Parameters.AddWithValue("@CarID", int.Parse(txtCarID.Text));
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Deleted");
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
-        private void btnSave_Click(object sender, EventArgs e)
+        private async void btnUpdate_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtCarID.Text) || string.IsNullOrWhiteSpace(txtCarName.Text) || string.IsNullOrWhiteSpace(txtCarNb.Text) || string.IsNullOrWhiteSpace(txtCarModel.Text) || string.IsNullOrWhiteSpace(txtRentPrice.Text) || string.IsNullOrWhiteSpace(txtCarStatus.Text))
+            if (string.IsNullOrWhiteSpace(txtCarID.Text)) { MessageBox.Show("Enter Car ID."); return; }
+            try
             {
-                MessageBox.Show("Please fill in all fields before saving.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var car = new
+                {
+                    carID = int.Parse(txtCarID.Text),
+                    carName = txtCarName.Text,
+                    carNumber = txtCarNb.Text,
+                    carModel = txtCarModel.Text,
+                    rentPrice = int.Parse(txtRentPrice.Text),
+                    carStatus = txtCarStatus.Text,
+                    carClass = (string)null,
+                    color = (string)null
+                };
+                var body = new StringContent(JsonConvert.SerializeObject(car), Encoding.UTF8, "application/json");
+                var res = await client.PutAsync($"https://localhost:7215/api/cars/{txtCarID.Text}", body);
+                MessageBox.Show(res.IsSuccessStatusCode ? "Car updated!" : "Error updating.");
+                await LoadCars();
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("insert into cars Values(@carid,@carname, @carnumber, @carmodel, @rentprice, @carstatus)", con);
-            cnn.Parameters.AddWithValue("@CarID", int.Parse(txtCarID.Text));
-            cnn.Parameters.AddWithValue("@CarName", txtCarName.Text);
-            cnn.Parameters.AddWithValue("@CarNumber", txtCarNb.Text);
-            cnn.Parameters.AddWithValue("@CarModel", txtCarModel.Text);
-            cnn.Parameters.AddWithValue("@RentPrice", int.Parse(txtRentPrice.Text));
-            cnn.Parameters.AddWithValue("@CarStatus", txtCarStatus.Text);
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Saved");
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
-        private void btnAdd_Click(object sender, EventArgs e)
+        private async void btnDelete_Click(object sender, EventArgs e)
         {
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            SqlCommand cnn = new SqlCommand("Select * from cars", con);
-            SqlDataAdapter da = new SqlDataAdapter(cnn);
-            DataTable table = new DataTable();
-            da.Fill(table);
-            dataGridView1.DataSource = table;
+            if (string.IsNullOrWhiteSpace(txtCarID.Text)) { MessageBox.Show("Enter Car ID."); return; }
+            try
+            {
+                var res = await client.DeleteAsync($"https://localhost:7215/api/cars/{txtCarID.Text}");
+                MessageBox.Show(res.IsSuccessStatusCode ? "Car deleted!" : "Error deleting.");
+                await LoadCars();
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
-        private void Car_Load(object sender, EventArgs e)
+        private async void btnAdd_Click(object sender, EventArgs e)
         {
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            SqlCommand cnn = new SqlCommand("Select * from cars", con);
-            SqlDataAdapter da = new SqlDataAdapter(cnn);
-            DataTable table = new DataTable();
-            da.Fill(table);
-            dataGridView1.DataSource = table;
+            await LoadCars();
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            txtCarID.Text = "";
-            txtCarName.Text = "";
-            txtCarNb.Text = "";
-            txtCarModel.Text = "";
-            txtRentPrice.Text = "";
-            txtCarStatus.Text = "";
-
+            txtCarID.Text = ""; txtCarName.Text = ""; txtCarNb.Text = "";
+            txtCarModel.Text = ""; txtRentPrice.Text = ""; txtCarStatus.Text = "";
         }
     }
 }

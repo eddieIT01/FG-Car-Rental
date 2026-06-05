@@ -1,14 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
+using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.StartPanel;
+using Newtonsoft.Json;
 
 namespace CarRental
 {
@@ -19,48 +13,56 @@ namespace CarRental
             InitializeComponent();
         }
 
-        private void label1_Click(object sender, EventArgs e)
-        {
+        private void label1_Click(object sender, EventArgs e) { }
 
-        }
-
-        private void btnLogin_Click(object sender, EventArgs e)
+        private async void btnLogin_Click(object sender, EventArgs e, HttpClient client)
         {
             if (string.IsNullOrWhiteSpace(txtUsername.Text) || string.IsNullOrWhiteSpace(txtPassword.Text))
             {
-                MessageBox.Show("Please enter both your username and password.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please enter username and password.", "Missing Info",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            string username = txtUsername.Text;
-            string password = txtPassword.Text;
-            SqlCommand cmd = new SqlCommand(" select UserName, Password from logintab where UserName = '" + txtUsername.Text + "'and Password='" + txtPassword.Text + "'", con);
-            SqlDataAdapter da = new SqlDataAdapter(cmd);
-            DataTable dt = new DataTable();
-            da.Fill(dt);
-            if (dt.Rows.Count > 0)
+
+            try
             {
-               Main mn = new Main();
-                mn.Show();
+                // ignore SSL for localhost
+                var handler = new HttpClientHandler();
+                handler.ServerCertificateCustomValidationCallback = (m, c, ch, e2) => true;
+                var httpClient = new HttpClient(handler);
+
+                var body = JsonConvert.SerializeObject(new
+                {
+                    username = txtUsername.Text,
+                    password = txtPassword.Text
+                });
+
+                var content = new StringContent(body, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync(
+                    "https://localhost:7215/api/admin/login", content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Main mn = new Main();
+                    mn.Show();
+                    this.Hide();
+                }
+                else
+                {
+                    MessageBox.Show("Invalid username or password.", "Login Failed",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("Invalid Login please check username and password");
-                con.Close();
-               
+                MessageBox.Show("Could not connect to API. Make sure the API project is running.\n" + ex.Message,
+                    "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void txtUsername_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter)
-            {
-                e.SuppressKeyPress = true; 
-                txtPassword.Focus();      
-            }
+            if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; txtPassword.Focus(); }
         }
     }
-    }
-    
-
+}

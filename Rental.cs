@@ -1,110 +1,91 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.Linq;
+using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using Newtonsoft.Json;
 
 namespace CarRental
 {
     public partial class Rental : Form
     {
-        public Rental()
+        private static readonly HttpClient client = CreateClient();
+        private static HttpClient CreateClient()
         {
-            InitializeComponent();
+            var handler = new HttpClientHandler();
+            handler.ServerCertificateCustomValidationCallback = (m, c, ch, e) => true;
+            return new HttpClient(handler);
         }
 
-        private void btnSave_Click(object sender, EventArgs e)
+        public Rental() { InitializeComponent(); }
+
+        private async void Rental_Load(object sender, EventArgs e) { await LoadRentals(); }
+
+        private async System.Threading.Tasks.Task LoadRentals()
         {
-            if (string.IsNullOrWhiteSpace(txtRentalID.Text) || string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(txtCarNumber.Text) || string.IsNullOrWhiteSpace(txtTotal.Text))
+            try
             {
-                MessageBox.Show("Please fill in all fields before saving.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var res = await client.GetStringAsync("https://localhost:7215/api/rentals");
+                dataGridView1.DataSource = JsonConvert.DeserializeObject<System.Data.DataTable>(res);
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("insert into rentals Values(@rentalid,@customername, @carnumber, @startdate, @enddate, @total)", con);
-            cnn.Parameters.AddWithValue("@RentalID", int.Parse(txtRentalID.Text));
-            cnn.Parameters.AddWithValue("@CustomerName", txtCustomerName.Text);
-            cnn.Parameters.AddWithValue("@CarNumber", txtCarNumber.Text);
-            cnn.Parameters.AddWithValue("@StartDate", dateTimePicker1.Value.Date);
-            cnn.Parameters.AddWithValue("@EndDate", dateTimePicker2.Value.Date);
-            cnn.Parameters.AddWithValue("@Total", int.Parse(txtTotal.Text));
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Saved");
+            catch { MessageBox.Show("Could not load rentals. Is the API running?"); }
         }
 
-        private void btnAdd_Click(object sender, EventArgs e)
+        private async void btnSave_Click(object sender, EventArgs e)
         {
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            SqlCommand cnn = new SqlCommand("Select * from rentals", con);
-            SqlDataAdapter da = new SqlDataAdapter(cnn);
-            DataTable table = new DataTable();
-            da.Fill(table);
-            dataGridView1.DataSource = table;
-        }
-
-        private void btnUpdate_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtRentalID.Text) || string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(txtCarNumber.Text) || string.IsNullOrWhiteSpace(txtTotal.Text))
+            if (string.IsNullOrWhiteSpace(txtCustomerName.Text) || string.IsNullOrWhiteSpace(txtCarNumber.Text))
+            { MessageBox.Show("Fill all fields.", "Missing Info", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            try
             {
-                MessageBox.Show("Please fill in all fields before updating.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var rental = new
+                {
+                    customerID = int.Parse(txtRentalID.Text),
+                    carID = int.Parse(txtCarNumber.Text),
+                    startDate = dateTimePicker1.Value.Date.ToString("yyyy-MM-dd"),
+                    endDate = dateTimePicker2.Value.Date.ToString("yyyy-MM-dd"),
+                    total = 0,
+                    status = "Active"
+                };
+                var body = new StringContent(JsonConvert.SerializeObject(rental), Encoding.UTF8, "application/json");
+                var res = await client.PostAsync("https://localhost:7215/api/rentals", body);
+                var responseText = await res.Content.ReadAsStringAsync();
+                MessageBox.Show(res.IsSuccessStatusCode ? "Booking confirmed! " + responseText : "Error: " + responseText);
+                await LoadRentals();
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("update rentals set [customer name]=@customername, [car number]=@carnumber, [start date]=@startdate, [end date]=@enddate, total=@total where rentalid=@rentalid", con);
-            cnn.Parameters.AddWithValue("@RentalID", int.Parse(txtRentalID.Text));
-            cnn.Parameters.AddWithValue("@CustomerName", txtCustomerName.Text);
-            cnn.Parameters.AddWithValue("@CarNumber", txtCarNumber.Text);
-            cnn.Parameters.AddWithValue("@StartDate", dateTimePicker1.Value.Date);
-            cnn.Parameters.AddWithValue("@EndDate", dateTimePicker2.Value.Date);
-            cnn.Parameters.AddWithValue("@Total", int.Parse(txtTotal.Text));
-            cnn.ExecuteNonQuery();
-            con.Close();
-            MessageBox.Show("Record Updated");
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
 
-        private void btnDelete_Click(object sender, EventArgs e)
+        private async void btnDelete_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtRentalID.Text))
+            if (string.IsNullOrWhiteSpace(txtRentalID.Text)) { MessageBox.Show("Enter Rental ID."); return; }
+            try
             {
-                MessageBox.Show("Please enter a Rental ID to delete.", "Missing Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var res = await client.DeleteAsync($"https://localhost:7215/api/rentals/{txtRentalID.Text}");
+                MessageBox.Show(res.IsSuccessStatusCode ? "Deleted!" : "Error deleting.");
+                await LoadRentals();
             }
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True;TrustServerCertificate=True");
-
-            con.Open();
-            SqlCommand cnn = new SqlCommand("delete from rentals where rentalid=@rentalid", con);
-            cnn.Parameters.AddWithValue("@RentalID", int.Parse(txtRentalID.Text));
-            cnn.ExecuteNonQuery(); con.Close();
-            MessageBox.Show("Record Deleted");
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
         }
+
+        private async void btnUpdate_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtRentalID.Text)) { MessageBox.Show("Enter Rental ID."); return; }
+            try
+            {
+                var res = await client.PutAsync(
+                    $"https://localhost:7215/api/rentals/{txtRentalID.Text}/cancel",
+                    new StringContent("", Encoding.UTF8, "application/json"));
+                MessageBox.Show(res.IsSuccessStatusCode ? "Rental cancelled!" : "Error cancelling.");
+                await LoadRentals();
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+        }
+
+        private async void btnAdd_Click(object sender, EventArgs e) { await LoadRentals(); }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            txtRentalID.Text = "";
-            txtCustomerName.Text = "";
-            txtCarNumber.Text = "";
-            txtTotal.Text = "";
-        }
-
-        private void Rental_Load(object sender, EventArgs e)
-        {
-            SqlConnection con = new SqlConnection(@"Data Source=DESKTOP-H67GPVM\SQLEXPRESS; Initial Catalog=RentalDB; Integrated Security=True; TrustServerCertificate=True");
-            con.Open();
-            SqlCommand cnn = new SqlCommand("Select * from rentals", con);
-            SqlDataAdapter da = new SqlDataAdapter(cnn);
-            DataTable table = new DataTable();
-            da.Fill(table);
-            dataGridView1.DataSource = table;
+            txtRentalID.Text = ""; txtCustomerName.Text = "";
+            txtCarNumber.Text = ""; txtTotal.Text = "";
         }
     }
 }
